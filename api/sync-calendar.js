@@ -5,7 +5,6 @@
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const CAL_API = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 
-// Pide un access token temporal usando el refresh token
 async function getAccessToken() {
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
@@ -22,7 +21,6 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-// Trae el pago desde Supabase
 async function getPayment(paymentId) {
   const url = `${process.env.SUPABASE_URL}/rest/v1/fixed_payments?id=eq.${paymentId}&select=*`;
   const res = await fetch(url, {
@@ -36,38 +34,49 @@ async function getPayment(paymentId) {
   return rows[0] || null;
 }
 
-// Busca la instancia del evento que cae dentro del mes indicado ("2026-07").
-// Si el evento no es recurrente, devuelve el evento mismo.
+// Devuelve { id, debug } para poder diagnosticar si algo falla
 async function findInstance(token, eventId, mes) {
   const [year, month] = mes.split("-").map(Number);
   const timeMin = new Date(Date.UTC(year, month - 1, 1)).toISOString();
   const timeMax = new Date(Date.UTC(year, month, 1)).toISOString();
 
-  const url = `${CAL_API}/${eventId}/instances?timeMin=${timeMin}&timeMax=${timeMax}`;
+  const url =
+    `${CAL_API}/${encodeURIComponent(eventId)}/instances` +
+    `?timeMin=${encodeURIComponent(timeMin)}` +
+    `&timeMax=${encodeURIComponent(timeMax)}` +
+    `&maxResults=5`;
+
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const raw = await res.text();
 
   if (res.ok) {
-    const data = await res.json();
-    if (data.items && data.items.length) return data.items[0].id;
+    const data = JSON.parse(raw);
+    if (data.items && data.items.length) {
+      return { id: data.items[0].id, debug: null };
+    }
+    // Evento único: la recurrencia no aplica, revisamos el evento directo
+    const single = await fetch(`${CAL_API}/${encodeURIComponent(eventId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const sraw = await single.text();
+    if (!single.ok) return { id: null, debug: `single ${single.status}: ${sraw}` };
+    const ev = JSON.parse(sraw);
+    const starts = ev.start?.dateTime || ev.start?.date || "";
+    return {
+      id: starts.startsWith(mes) ? ev.id : null,
+      debug: starts.startsWith(mes) ? null : `evento unico fuera del mes (${starts})`,
+    };
   }
 
-  // Evento único (no recurrente): la API de instances falla, usamos el evento directo
-  const single = await fetch(`${CAL_API}/${eventId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!single.ok) return null;
-  const ev = await single.json();
-  return ev.start?.dateTime?.startsWith(mes) ? ev.id : null;
+  return { id: null, debug: `instances ${res.status}: ${raw.slice(0, 300)}` };
 }
 
-// Formatea "S/ 120" o "US$ 21"
 function formatMonto(monto, moneda) {
   const n = Number(monto);
   return moneda === "USD" ? `US$${n}` : `S/${n}`;
 }
 
 export default async function handler(req, res) {
-  // Solo aceptamos llamadas con el secreto correcto
   const secret = req.headers["x-webhook-secret"];
   if (secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: "No autorizado" });
@@ -86,16 +95,25 @@ export default async function handler(req, res) {
     }
 
     const token = await getAccessToken();
-    const instanceId = await findInstance(token, pago.calendar_event_id, row.mes);
+    const { id: instanceId, debug } = await findInstance(
+      token,
+      pago.calendar_event_id,
+      row.mes
+    );
+
     if (!instanceId) {
-      return res.status(200).json({ skipped: "no se encontro instancia del mes" });
+      return res.status(200).json({
+        skipped: "no se encontro instancia",
+        pago: pago.nombre,
+        eventId: pago.calendar_event_id,
+        mes: row.mes,
+        debug,
+      });
     }
 
     const monto = formatMonto(pago.monto, pago.moneda);
     const pagado = type === "INSERT";
 
-    // Si esta pagado: titulo con check y sin recordatorios.
-    // Si se desmarca: vuelve el titulo normal y los avisos (3 dias antes + mismo dia).
     const body = pagado
       ? {
           summary: `✅ ${pago.nombre} pagado - ${monto}`,
@@ -112,7 +130,7 @@ export default async function handler(req, res) {
           },
         };
 
-    const patch = await fetch(`${CAL_API}/${instanceId}`, {
+    const patch = await fetch(`${CAL_API}/${encodeURIComponent(instanceId)}`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -121,14 +139,15 @@ export default async function handler(req, res) {
       body: JSON.stringify(body),
     });
 
+    const praw = await patch.text();
     if (!patch.ok) {
-      const err = await patch.json();
-      throw new Error(`Calendar PATCH: ${JSON.stringify(err)}`);
+      return res
+        .status(200)
+        .json({ error: "patch fallo", status: patch.status, detalle: praw.slice(0, 300) });
     }
 
     return res.status(200).json({ ok: true, pago: pago.nombre, pagado });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message });
+    return res.status(200).json({ error: e.message });
   }
 }
