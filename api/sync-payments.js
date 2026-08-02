@@ -147,6 +147,54 @@ async function borrarEvento(token, eventId) {
   }
 }
 
+// Al tocar el evento padre, Google reescribe todas sus instancias y borra las
+// marcas de "pagado". Esto las vuelve a poner segun el historial real.
+async function reaplicarPagados(token, pago) {
+  const url =
+    `${process.env.SUPABASE_URL}/rest/v1/payment_history` +
+    `?payment_id=eq.${pago.id}&select=mes`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) return;
+  const meses = await res.json();
+  if (!Array.isArray(meses) || !meses.length) return;
+
+  // Solo desde el mes actual en adelante: los meses viejos ya no importan
+  const hoy = new Date().toISOString().slice(0, 7);
+
+  for (const { mes } of meses) {
+    if (mes < hoy) continue;
+    const [y, m] = mes.split("-").map(Number);
+    const timeMin = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    const timeMax = new Date(Date.UTC(y, m, 1)).toISOString();
+
+    const inst = await fetch(
+      `${CAL_API}/${encodeURIComponent(pago.calendar_event_id)}/instances` +
+        `?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&maxResults=5`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!inst.ok) continue;
+    const data = await inst.json();
+    if (!data.items || !data.items.length) continue;
+
+    await fetch(`${CAL_API}/${encodeURIComponent(data.items[0].id)}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: `✅ ${pago.nombre} pagado - ${formatMonto(pago.monto, pago.moneda)}`,
+        reminders: { useDefault: false, overrides: [] },
+      }),
+    });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.headers["x-webhook-secret"] !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: "No autorizado" });
@@ -212,6 +260,7 @@ export default async function handler(req, res) {
         record.tipo !== old_record.tipo ||
         record.fecha_unica !== old_record.fecha_unica;
       await actualizarEvento(token, record.calendar_event_id, record, cambioDia);
+      await reaplicarPagados(token, record);
       return res
         .status(200)
         .json({ ok: true, accion: cambioDia ? "fecha y titulo" : "titulo" });
