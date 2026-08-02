@@ -76,6 +76,22 @@ function formatMonto(monto, moneda) {
   return moneda === "USD" ? `US$${n}` : `S/${n}`;
 }
 
+// Deja constancia en la base para que la app pueda avisar
+async function registrarError(contexto, mensaje) {
+  try {
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/sync_errors`, {
+      method: "POST",
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ contexto, mensaje: String(mensaje).slice(0, 500) }),
+    });
+  } catch (_) {}
+}
+
 export default async function handler(req, res) {
   const secret = req.headers["x-webhook-secret"];
   if (secret !== process.env.WEBHOOK_SECRET) {
@@ -141,6 +157,7 @@ export default async function handler(req, res) {
 
     const praw = await patch.text();
     if (!patch.ok) {
+      await registrarError("marcado de pago", `${patch.status}: ${praw.slice(0, 300)}`);
       return res
         .status(200)
         .json({ error: "patch fallo", status: patch.status, detalle: praw.slice(0, 300) });
@@ -148,6 +165,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, pago: pago.nombre, pagado });
   } catch (e) {
+    await registrarError("marcado de pago", e.message);
     return res.status(200).json({ error: e.message });
   }
 }
