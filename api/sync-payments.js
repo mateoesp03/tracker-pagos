@@ -72,6 +72,16 @@ const RECORDATORIOS = {
 };
 
 function cuerpoEvento(pago) {
+  // Pago de una sola vez: evento suelto en su fecha, sin repeticion
+  if (pago.tipo === "unico" && pago.fecha_unica) {
+    return {
+      summary: titulo(pago),
+      start: { dateTime: `${pago.fecha_unica}T09:00:00`, timeZone: TZ },
+      end: { dateTime: `${pago.fecha_unica}T09:15:00`, timeZone: TZ },
+      recurrence: null,
+      reminders: RECORDATORIOS,
+    };
+  }
   const fecha = proximaFecha(pago.dia_cobro);
   return {
     summary: titulo(pago),
@@ -80,6 +90,22 @@ function cuerpoEvento(pago) {
     recurrence: [`RRULE:FREQ=MONTHLY;BYMONTHDAY=${pago.dia_cobro}`],
     reminders: RECORDATORIOS,
   };
+}
+
+// Deja constancia en la base para que la app pueda avisar
+async function registrarError(contexto, mensaje) {
+  try {
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/sync_errors`, {
+      method: "POST",
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ contexto, mensaje: String(mensaje).slice(0, 500) }),
+    });
+  } catch (_) {}
 }
 
 async function crearEvento(token, pago) {
@@ -157,6 +183,9 @@ export default async function handler(req, res) {
         Number(record.monto) === Number(old_record.monto) &&
         record.moneda === old_record.moneda &&
         record.dia_cobro === old_record.dia_cobro &&
+        record.tipo === old_record.tipo &&
+        record.fecha_unica === old_record.fecha_unica &&
+        record.categoria === old_record.categoria &&
         record.activo === old_record.activo;
       if (soloCambioElId) {
         return res.status(200).json({ skipped: "solo se guardo el id" });
@@ -178,7 +207,10 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, accion: "evento creado", eventId });
       }
 
-      const cambioDia = record.dia_cobro !== old_record.dia_cobro;
+      const cambioDia =
+        record.dia_cobro !== old_record.dia_cobro ||
+        record.tipo !== old_record.tipo ||
+        record.fecha_unica !== old_record.fecha_unica;
       await actualizarEvento(token, record.calendar_event_id, record, cambioDia);
       return res
         .status(200)
@@ -187,6 +219,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ skipped: `tipo ${type} sin manejar` });
   } catch (e) {
+    await registrarError("pagos", e.message);
     return res.status(200).json({ error: e.message });
   }
 }
