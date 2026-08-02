@@ -435,7 +435,9 @@ async function loadPayments(){
     return;
   }
 
-  const mesActual = new Date().toISOString().slice(0,7); // YYYY-MM
+  // Mes actual en hora local: con UTC, marcar de noche a fin de mes lo mandaba al mes siguiente
+  const ahora = new Date();
+  const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}`;
   const { data: historial } = await client
     .from('payment_history')
     .select('payment_id')
