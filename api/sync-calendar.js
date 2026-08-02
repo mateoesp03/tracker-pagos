@@ -111,11 +111,18 @@ export default async function handler(req, res) {
     }
 
     const token = await getAccessToken();
-    const { id: instanceId, debug } = await findInstance(
-      token,
-      pago.calendar_event_id,
-      row.mes
-    );
+
+    // Un pago de una sola vez no tiene repeticiones: el evento es uno solo
+    let instanceId, debug;
+    if (pago.tipo === "unico") {
+      instanceId = pago.calendar_event_id;
+    } else {
+      ({ id: instanceId, debug } = await findInstance(
+        token,
+        pago.calendar_event_id,
+        row.mes
+      ));
+    }
 
     if (!instanceId) {
       return res.status(200).json({
