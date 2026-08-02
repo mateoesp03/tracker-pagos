@@ -48,9 +48,26 @@
     box-shadow:0 8px 24px -8px rgba(47,125,107,0.4);
   }
   .hero .label{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.06em;}
-  .hero .amount{font-size:36px;font-weight:700;margin:4px 0 14px;letter-spacing:-0.02em;}
+  .hero .amount{font-size:36px;font-weight:700;margin:4px 0 2px;letter-spacing:-0.02em;}
+  .hero .split{font-size:12px;opacity:.75;margin-bottom:16px;}
   .hero .stats{display:flex;gap:20px;font-size:13px;}
   .hero .stats b{display:block;font-size:16px;}
+
+  .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden;margin-bottom:8px;}
+  .bar span{display:block;height:100%;background:#fff;border-radius:99px;width:0;transition:width .5s cubic-bezier(.4,0,.2,1);}
+  .hero .progress-meta{display:flex;justify-content:space-between;font-size:12px;opacity:.85;margin-bottom:16px;}
+
+  .tc{
+    position:absolute;top:20px;right:76px;
+    display:flex;align-items:center;gap:5px;
+    background:none;border:1px solid var(--line);border-radius:20px;
+    padding:6px 12px;font-size:12px;color:var(--muted);
+  }
+  .tc input{
+    background:none;border:none;padding:0;width:38px;font-size:12px;
+    color:var(--text);font-weight:600;text-align:left;
+  }
+  .tc input:focus{outline:none;}
 
   .section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:24px 0 10px;}
 
@@ -127,6 +144,46 @@
   }
   .empty{color:var(--muted);text-align:center;padding:50px 20px;font-size:14px;background:var(--panel);border-radius:16px;border:1px dashed var(--line);}
 
+  /* Desglose por categoria */
+  .breakdown{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 2px 8px -4px rgba(0,0,0,0.06);}
+  .cat{margin-bottom:14px;}
+  .cat:last-child{margin-bottom:0;}
+  .cat .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
+  .cat .top b{font-weight:600;}
+  .cat .top span{color:var(--muted);}
+  .cat .track{height:7px;border-radius:99px;background:#f0ede6;overflow:hidden;}
+  .cat .track i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+
+  /* Historial */
+  .mes-group{margin-bottom:14px;}
+  .mes-group h4{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--muted);display:flex;justify-content:space-between;}
+  .mes-group .items{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .mes-item{display:flex;justify-content:space-between;padding:11px 14px;font-size:14px;border-bottom:1px solid var(--line);}
+  .mes-item:last-child{border-bottom:none;}
+  .mes-item span{color:var(--muted);font-size:13px;}
+
+  /* Aviso de fallas de sincronizacion */
+  .alert{
+    background:#fdf0ed;border:1px solid #f0c4ba;color:#8f3f31;
+    border-radius:14px;padding:13px 15px;font-size:13px;margin-bottom:16px;
+    display:none;
+  }
+  .alert b{display:block;margin-bottom:3px;}
+  .alert button{
+    background:none;border:1px solid #e0aa9d;color:#8f3f31;
+    padding:5px 11px;font-size:12px;border-radius:8px;margin-top:9px;width:auto;
+  }
+
+  /* Pestañas */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tabs button{
+    flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:10px;font-size:13px;font-weight:600;border-radius:11px;
+  }
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .view{display:none;}
+  .view.on{display:block;}
+
   #login-screen{
     max-width:360px;margin:15vh auto 0;
     background:var(--panel);border:1px solid var(--line);border-radius:16px;
@@ -161,6 +218,10 @@
 
 <div id="app">
 <button id="logout-btn">Salir</button>
+<div class="tc">
+  <span>T.C.</span>
+  <input type="number" id="tc-input" step="0.01" min="0.01" inputmode="decimal">
+</div>
 <div class="wrap">
   <header>
     <h1>Pagos fijos</h1>
@@ -169,16 +230,33 @@
 
   <div class="hero">
     <div class="label">Total mensual</div>
-    <div class="amount" style="display:flex;align-items:baseline;gap:10px;">
-      <span id="total-pen">S/ 0.00</span>
-      <span style="opacity:.5;font-size:24px;">/</span>
-      <span id="total-usd">US$ 0.00</span>
+    <div class="amount" id="total-general">S/ 0.00</div>
+    <div class="split" id="total-split">—</div>
+
+    <div class="bar"><span id="bar-fill"></span></div>
+    <div class="progress-meta">
+      <span id="pagado-txt">Pagado S/ 0.00</span>
+      <span id="falta-txt">Falta S/ 0.00</span>
     </div>
+
     <div class="stats">
       <div><b id="count">0</b>pagos activos</div>
       <div><b id="next">—</b>próximo cobro</div>
     </div>
   </div>
+
+  <div class="alert" id="alert">
+    <b>La sincronización con el calendario falló</b>
+    <span id="alert-msg"></span>
+    <button type="button" id="alert-ok">Entendido</button>
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="on" data-view="pagos">Este mes</button>
+    <button type="button" data-view="historial">Historial</button>
+  </div>
+
+  <div class="view on" id="view-pagos">
 
   <div class="section-title">Agregar pago</div>
   <form id="form">
@@ -198,12 +276,30 @@
       </select>
     </div>
     <div>
+      <label>Frecuencia</label>
+      <select id="tipo">
+        <option value="recurrente">Todos los meses</option>
+        <option value="unico">Una sola vez</option>
+      </select>
+    </div>
+    <div id="campo-dia">
       <label>Día de cobro</label>
-      <input type="number" id="dia" placeholder="1-31" min="1" max="31" required>
+      <input type="number" id="dia" placeholder="1-31" min="1" max="31">
+    </div>
+    <div id="campo-fecha" style="display:none;">
+      <label>Fecha de cobro</label>
+      <input type="date" id="fecha">
     </div>
     <div class="full">
       <label>Categoría</label>
-      <input type="text" id="categoria" placeholder="Suscripciones, vivienda, transporte...">
+      <select id="categoria">
+        <option value="Hogar">Hogar</option>
+        <option value="Suscripciones">Suscripciones</option>
+        <option value="Deuda">Deuda</option>
+        <option value="Salud">Salud</option>
+        <option value="Comida">Comida</option>
+        <option value="Otros">Otros</option>
+      </select>
     </div>
     <button type="submit" id="submit-btn">+ Agregar pago</button>
     <button type="button" id="cancel-edit" style="display:none;background:none;border:1px solid var(--line);color:var(--muted);">Cancelar edición</button>
@@ -211,6 +307,16 @@
 
   <div class="section-title">Tus pagos</div>
   <div class="list" id="list"></div>
+
+  <div class="section-title">En qué se va</div>
+  <div class="breakdown" id="breakdown"></div>
+
+  </div>
+
+  <div class="view" id="view-historial">
+    <div class="section-title">Meses anteriores</div>
+    <div id="historial"></div>
+  </div>
 </div>
 </div>
 
@@ -265,10 +371,54 @@ checkSession();
 
 const form = document.getElementById('form');
 const list = document.getElementById('list');
-const totalPenEl = document.getElementById('total-pen');
-const totalUsdEl = document.getElementById('total-usd');
+const totalGeneralEl = document.getElementById('total-general');
+const totalSplitEl = document.getElementById('total-split');
+const barFillEl = document.getElementById('bar-fill');
+const pagadoTxtEl = document.getElementById('pagado-txt');
+const faltaTxtEl = document.getElementById('falta-txt');
 const countEl = document.getElementById('count');
 const nextEl = document.getElementById('next');
+
+// Tipo de cambio para consolidar dolares a soles. Se guarda en el navegador.
+const tcInput = document.getElementById('tc-input');
+let tipoCambio = parseFloat(localStorage.getItem('tipoCambio')) || 3.40;
+tcInput.value = tipoCambio;
+
+tcInput.addEventListener('change', () => {
+  const v = parseFloat(tcInput.value);
+  if(!v || v <= 0){ tcInput.value = tipoCambio; return; }
+  tipoCambio = v;
+  localStorage.setItem('tipoCambio', v);
+  loadPayments();
+});
+
+// Todo se calcula en soles
+const aSoles = p => Number(p.monto) * (p.moneda === 'USD' ? tipoCambio : 1);
+const soles = n => `S/ ${n.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+const COLOR_CAT = {
+  'Hogar':'#2f7d6b', 'Suscripciones':'#5a7fa8', 'Deuda':'#c1594a',
+  'Salud':'#7a9e5c', 'Comida':'#d9a441', 'Otros':'#9c8fa8'
+};
+
+// Pestañas
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('view-' + b.dataset.view).classList.add('on');
+    if(b.dataset.view === 'historial') loadHistorial();
+  });
+});
+
+// El formulario cambia segun sea pago mensual o de una sola vez
+const tipoSel = document.getElementById('tipo');
+tipoSel.addEventListener('change', () => {
+  const unico = tipoSel.value === 'unico';
+  document.getElementById('campo-dia').style.display = unico ? 'none' : 'block';
+  document.getElementById('campo-fecha').style.display = unico ? 'block' : 'none';
+});
 const submitBtn = document.getElementById('submit-btn');
 const cancelEditBtn = document.getElementById('cancel-edit');
 let editingId = null;
@@ -293,28 +443,95 @@ async function loadPayments(){
 
   const pagadosIds = new Set((historial || []).map(h => h.payment_id));
   render(data, pagadosIds, mesActual);
+  checkSyncErrors();
 }
+
+// Avisa si el calendario dejo de sincronizarse
+async function checkSyncErrors(){
+  const { data } = await client
+    .from('sync_errors')
+    .select('*')
+    .eq('visto', false)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  const box = document.getElementById('alert');
+  if(data && data.length){
+    document.getElementById('alert-msg').textContent =
+      `Último intento: ${data[0].contexto || 'sincronización'}. Tus pagos están guardados, pero el calendario puede estar desactualizado.`;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+document.getElementById('alert-ok').addEventListener('click', async () => {
+  await client.from('sync_errors').update({ visto: true }).eq('visto', false);
+  document.getElementById('alert').style.display = 'none';
+});
 
 function render(payments, pagadosIds, mesActual){
   if(!payments.length){
     list.innerHTML = '<div class="empty">Aún no tienes pagos fijos.<br>Agrega el primero arriba.</div>';
-    totalPenEl.textContent = 'S/ 0.00';
-    totalUsdEl.textContent = 'US$ 0.00';
+    totalGeneralEl.textContent = 'S/ 0.00';
+    totalSplitEl.textContent = '—';
+    barFillEl.style.width = '0%';
+    pagadoTxtEl.textContent = 'Pagado S/ 0.00';
+    faltaTxtEl.textContent = 'Falta S/ 0.00';
     countEl.textContent = '0';
     nextEl.textContent = '—';
     return;
   }
 
+  const total = payments.reduce((s,p) => s + aSoles(p), 0);
+  const pagado = payments.filter(p => pagadosIds.has(p.id)).reduce((s,p) => s + aSoles(p), 0);
+  const falta = total - pagado;
+
   const totalPEN = payments.filter(p => (p.moneda || 'PEN') === 'PEN').reduce((s,p) => s + Number(p.monto), 0);
   const totalUSD = payments.filter(p => p.moneda === 'USD').reduce((s,p) => s + Number(p.monto), 0);
-  totalPenEl.textContent = `S/ ${totalPEN.toFixed(2)}`;
-  totalUsdEl.textContent = `US$ ${totalUSD.toFixed(2)}`;
+
+  totalGeneralEl.textContent = soles(total);
+  totalSplitEl.textContent = totalUSD > 0
+    ? `S/ ${totalPEN.toFixed(2)} + US$ ${totalUSD.toFixed(2)} al cambio de ${tipoCambio}`
+    : `${payments.length} pagos en soles`;
+
+  barFillEl.style.width = `${total ? (pagado / total) * 100 : 0}%`;
+  pagadoTxtEl.textContent = `Pagado ${soles(pagado)}`;
+  faltaTxtEl.textContent = `Falta ${soles(falta)}`;
   countEl.textContent = payments.length;
 
-  const today = new Date().getDate();
-  const withDiff = payments.map(p => ({...p, diff: p.dia_cobro >= today ? p.dia_cobro - today : p.dia_cobro - today + 31}));
+  const hoy = new Date();
+  const today = hoy.getDate();
+  const withDiff = payments.map(p => {
+    let diff;
+    if(p.tipo === 'unico' && p.fecha_unica){
+      const [y,m,d] = p.fecha_unica.split('-').map(Number);
+      diff = Math.round((Date.UTC(y,m-1,d) - Date.UTC(hoy.getFullYear(),hoy.getMonth(),today)) / 86400000);
+    } else {
+      diff = p.dia_cobro >= today ? p.dia_cobro - today : p.dia_cobro - today + 31;
+    }
+    return {...p, diff};
+  });
   const upcoming = withDiff.filter(p => !pagadosIds.has(p.id)).sort((a,b) => a.diff - b.diff)[0];
   nextEl.textContent = upcoming ? `${upcoming.nombre}` : '—';
+
+  // Desglose por categoria
+  const porCat = {};
+  payments.forEach(p => {
+    const c = p.categoria || 'Otros';
+    porCat[c] = (porCat[c] || 0) + aSoles(p);
+  });
+  const bd = document.getElementById('breakdown');
+  bd.innerHTML = Object.entries(porCat)
+    .sort((a,b) => b[1] - a[1])
+    .map(([cat, monto]) => {
+      const pct = total ? (monto / total) * 100 : 0;
+      return `
+      <div class="cat">
+        <div class="top"><b>${cat}</b><span>${soles(monto)} · ${pct.toFixed(0)}%</span></div>
+        <div class="track"><i style="width:${pct}%;background:${COLOR_CAT[cat] || COLOR_CAT.Otros}"></i></div>
+      </div>`;
+    }).join('');
 
   list.innerHTML = withDiff
     .sort((a,b) => a.diff - b.diff)
@@ -324,10 +541,10 @@ function render(payments, pagadosIds, mesActual){
       return `
     <div class="row urgent-${level}">
       <div class="left">
-        <button class="paid-toggle badge ${level}" data-id="${p.id}" data-paid="${pagado}" title="${pagado ? 'Marcar como pendiente' : 'Marcar como pagado'}" style="border:none;cursor:pointer;">${pagado ? '✓' : p.dia_cobro}</button>
+        <button class="paid-toggle badge ${level}" data-id="${p.id}" data-paid="${pagado}" title="${pagado ? 'Marcar como pendiente' : 'Marcar como pagado'}" style="border:none;cursor:pointer;">${pagado ? '✓' : (p.tipo === 'unico' ? '1×' : p.dia_cobro)}</button>
         <div class="info">
           <b>${p.nombre}</b>
-          <div class="meta">${p.categoria || 'Sin categoría'} · ${pagado ? 'pagado este mes' : `en ${p.diff} día${p.diff===1?'':'s'}`}</div>
+          <div class="meta">${p.categoria || 'Otros'} · ${pagado ? 'pagado este mes' : (p.diff < 0 ? 'vencido' : `en ${p.diff} día${p.diff===1?'':'s'}`)}</div>
         </div>
       </div>
       <div class="right">
@@ -341,6 +558,9 @@ function render(payments, pagadosIds, mesActual){
 
   document.querySelectorAll('.del').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const fila = btn.closest('.row');
+      const nombre = fila ? fila.querySelector('.info b').textContent : 'este pago';
+      if(!confirm(`¿Borrar ${nombre}? También se quitará su recordatorio del calendario.`)) return;
       await client.from('fixed_payments').delete().eq('id', btn.dataset.id);
       loadPayments();
     });
@@ -361,11 +581,15 @@ function render(payments, pagadosIds, mesActual){
   document.querySelectorAll('.edit').forEach(btn => {
     btn.addEventListener('click', () => {
       editingId = btn.dataset.id;
+      const p = payments.find(x => x.id === btn.dataset.id) || {};
       document.getElementById('nombre').value = btn.dataset.nombre;
       document.getElementById('monto').value = btn.dataset.monto;
       document.getElementById('moneda').value = btn.dataset.moneda;
       document.getElementById('dia').value = btn.dataset.dia;
-      document.getElementById('categoria').value = btn.dataset.categoria;
+      document.getElementById('categoria').value = btn.dataset.categoria || 'Otros';
+      tipoSel.value = p.tipo || 'recurrente';
+      document.getElementById('fecha').value = p.fecha_unica || '';
+      tipoSel.dispatchEvent(new Event('change'));
       submitBtn.textContent = 'Guardar cambios';
       cancelEditBtn.style.display = 'block';
       window.scrollTo({top:0, behavior:'smooth'});
@@ -385,14 +609,26 @@ form.addEventListener('submit', async (e) => {
   const nombre = document.getElementById('nombre').value.trim();
   const monto = parseFloat(document.getElementById('monto').value);
   const moneda = document.getElementById('moneda').value;
-  const dia_cobro = parseInt(document.getElementById('dia').value);
-  const categoria = document.getElementById('categoria').value.trim();
+  const categoria = document.getElementById('categoria').value;
+  const tipo = tipoSel.value;
+
+  let dia_cobro, fecha_unica = null;
+  if(tipo === 'unico'){
+    fecha_unica = document.getElementById('fecha').value;
+    if(!fecha_unica){ alert('Elige la fecha de cobro'); return; }
+    dia_cobro = Number(fecha_unica.split('-')[2]);
+  } else {
+    dia_cobro = parseInt(document.getElementById('dia').value);
+    if(!dia_cobro){ alert('Indica el día de cobro'); return; }
+  }
+
+  const fila = { nombre, monto, moneda, dia_cobro, categoria, tipo, fecha_unica };
 
   let error;
   if(editingId){
-    ({ error } = await client.from('fixed_payments').update({ nombre, monto, moneda, dia_cobro, categoria }).eq('id', editingId));
+    ({ error } = await client.from('fixed_payments').update(fila).eq('id', editingId));
   } else {
-    ({ error } = await client.from('fixed_payments').insert([{ nombre, monto, moneda, dia_cobro, categoria }]));
+    ({ error } = await client.from('fixed_payments').insert([fila]));
   }
 
   if(error){
@@ -403,8 +639,46 @@ form.addEventListener('submit', async (e) => {
   submitBtn.textContent = '+ Agregar pago';
   cancelEditBtn.style.display = 'none';
   form.reset();
+  tipoSel.dispatchEvent(new Event('change'));
   loadPayments();
 });
+
+// ---- Historial de meses anteriores ----
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+async function loadHistorial(){
+  const cont = document.getElementById('historial');
+  cont.innerHTML = '<div class="empty">Cargando…</div>';
+
+  const { data, error } = await client
+    .from('payment_history')
+    .select('mes, fecha_pagado, fixed_payments(nombre, monto, moneda)')
+    .order('mes', { ascending: false });
+
+  if(error){ cont.innerHTML = `<div class="empty">No se pudo cargar: ${error.message}</div>`; return; }
+  if(!data.length){ cont.innerHTML = '<div class="empty">Todavía no hay pagos registrados.</div>'; return; }
+
+  const porMes = {};
+  data.forEach(h => {
+    if(!h.fixed_payments) return;
+    (porMes[h.mes] = porMes[h.mes] || []).push(h);
+  });
+
+  cont.innerHTML = Object.entries(porMes).map(([mes, items]) => {
+    const [y, m] = mes.split('-').map(Number);
+    const suma = items.reduce((s,h) => s + Number(h.fixed_payments.monto) * (h.fixed_payments.moneda === 'USD' ? tipoCambio : 1), 0);
+    return `
+      <div class="mes-group">
+        <h4><span>${MESES[m-1]} ${y}</span><span>${soles(suma)}</span></h4>
+        <div class="items">
+          ${items.map(h => `
+            <div class="mes-item">
+              <span style="color:var(--text)">${h.fixed_payments.nombre}</span>
+              <span>${h.fixed_payments.moneda === 'USD' ? 'US$' : 'S/'} ${Number(h.fixed_payments.monto).toFixed(2)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
 </script>
 </body>
-</html>
