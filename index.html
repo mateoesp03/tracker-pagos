@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Pagos Fijos</title>
+<title>Pagos fijos y variables</title>
 <meta name="theme-color" content="#faf8f4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -203,7 +203,7 @@
 </head>
 <body>
 <div id="login-screen">
-  <h2>Pagos fijos</h2>
+  <h2>Pagos fijos y variables</h2>
   <div class="sub" style="color:var(--muted);font-size:14px;">Inicia sesión para continuar</div>
   <form id="login-form" style="display:block;">
     <input type="email" id="login-email" placeholder="Correo" required>
@@ -224,8 +224,8 @@
 </div>
 <div class="wrap">
   <header>
-    <h1>Pagos fijos</h1>
-    <div class="sub">Tus gastos recurrentes, bajo control</div>
+    <h1>Pagos fijos y variables</h1>
+    <div class="sub">Lo que pagas cada mes y lo que cae una sola vez</div>
   </header>
 
   <div class="hero">
@@ -472,7 +472,7 @@ document.getElementById('alert-ok').addEventListener('click', async () => {
 
 function render(payments, pagadosIds, mesActual){
   if(!payments.length){
-    list.innerHTML = '<div class="empty">Aún no tienes pagos fijos.<br>Agrega el primero arriba.</div>';
+    list.innerHTML = '<div class="empty">Aún no tienes pagos registrados.<br>Agrega el primero arriba.</div>';
     totalGeneralEl.textContent = 'S/ 0.00';
     totalSplitEl.textContent = '—';
     barFillEl.style.width = '0%';
@@ -682,3 +682,4 @@ async function loadHistorial(){
 }
 </script>
 </body>
+</html>
